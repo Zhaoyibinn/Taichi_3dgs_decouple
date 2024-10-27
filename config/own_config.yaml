@@ -1,0 +1,61 @@
+adaptive-controller-config:
+  densification-multi-frame-position-gradients-threshold: 1000.0
+  densification-multi-frame-view-pixel-avg-space-position-gradients-threshold: 1000.0
+  densification-multi-frame-view-space-position-gradients-threshold: 1000.0
+  densification-view-avg-space-position-gradients-threshold: 1000.0
+  densification-view-space-position-gradients-threshold: 4.0e-06
+  enable-ellipsoid-offset: false
+  enable-sample-from-point: true
+  floater-depth-threshold: 100
+  floater-near-camrea-num-pixels-threshold: 30000
+  floater-num-pixels-threshold: 40000
+  gaussian-split-factor-phi: 1.6
+  iteration-start-remove-floater: 2000
+  num-iterations-densify: 100
+  num-iterations-reset-alpha: 999999
+  num-iterations-warm-up: 300
+  plot-densify-interval: 200
+  reset-alpha-value: -1.9
+  transparent-alpha-threshold: -2.0
+  under-reconstructed-move-factor: 100.0
+  under-reconstructed-num-pixels-threshold: 256
+enable-taichi-kernel-profiler: true
+feature-learning-rate: 0.005
+gaussian-point-cloud-scene-config:
+  add-sphere: false
+  initial-alpha: -0.0
+  initial-covariance-ratio: 0.1
+  max-initial-covariance: 3000.0
+  max-num-points-ratio: 10.0
+  num-of-features: 56
+  num-points-sphere: 10000
+  sphere-radius-factor: 4.0
+half-downsample-factor-interval: 250
+increase-color-max-sh-band-interval: 1000
+initial-downsample-factor: 1
+log-image-interval: 200
+log-loss-interval: 10
+log-metrics-interval: 500
+log-taichi-kernel-profile-interval: 3000
+log-validation-image: true
+loss-function-config:
+  enable-regularization: false
+  lambda-value: 0.0
+  regularization-weight: 0.005
+num-iterations: 30000
+out-loss: 1000
+output-model-dir: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/logs/test_net
+pointcloud-parquet-path: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lego/point_cloud.parquet
+position-learning-rate: 1.0e-05
+position-learning-rate-decay-interval: 100
+position-learning-rate-decay-rate: 0.9847
+print-metrics-to-console: false
+rasterisation-config:
+  depth-to-sort-key-scale: 10.0
+  far-plane: 2000.0
+  near-plane: 0.4
+  rgb-only: false
+summary-writer-log-dir: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/logs/test_net
+train-dataset-json-path: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lego/train.json
+val-dataset-json-path: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lego/train.json
+val-interval: 1000
