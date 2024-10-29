@@ -4,6 +4,8 @@ Fork of taichi_3d_gaussian_splatting. Add decoupled model to solve different lig
 
 The rendered picture is masked by decoupled model to avoid dark floaters.
 
+This is main branch test.
+
 **Created by ZhaoYiBin from ECUST LAB10204 3DReconstruction Group**
 
 
