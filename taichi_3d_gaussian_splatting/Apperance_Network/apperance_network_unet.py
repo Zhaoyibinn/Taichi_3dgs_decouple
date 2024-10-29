@@ -1,19 +1,22 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+# from .unet_parts import *
+from .UNet import UNet
 
 
 # https://github.com/autonomousvision/gaussian-opacity-fields
-def decouple_appearance(image, appearance_embedding,appearance_network):
+def decouple_appearance(image, appearance_embedding,appearance_network,q,t):
     # appearance_embedding = gaussians.get_apperance_embedding(view_idx)
     H, W = image.size(1), image.size(2)
     # down sample the image
+    # crop_image_down = \
+    # torch.nn.functional.interpolate(image[None], size=(H // 32, W // 32), mode="bilinear", align_corners=True)[0]
+    
+    # crop_image_down = \
+    # torch.cat([crop_image_down, appearance_embedding[None].repeat(H // 32, W // 32, 1).permute(2, 0, 1)], dim=0)[None]
     crop_image_down = \
-    torch.nn.functional.interpolate(image[None], size=(H // 32, W // 32), mode="bilinear", align_corners=True)[0]
-
-    crop_image_down = \
-    torch.cat([crop_image_down, appearance_embedding[None].repeat(H // 32, W // 32, 1).permute(2, 0, 1)], dim=0)[None]
-
+    torch.nn.functional.interpolate(image[None], size=(H // 4, W // 4), mode="bilinear", align_corners=True)[0]
     mapping_image = appearance_network(crop_image_down, H, W).squeeze()
     transformed_image = mapping_image * image
 
@@ -23,9 +26,15 @@ def decouple_appearance(image, appearance_embedding,appearance_network):
 class UpsampleBlock(nn.Module):
     def __init__(self, num_input_channels, num_output_channels):
         super(UpsampleBlock, self).__init__()
+
+        
+
+
         self.pixel_shuffle = nn.PixelShuffle(2)
         self.conv = nn.Conv2d(num_input_channels // (2 * 2), num_output_channels, 3, stride=1, padding=1)
         self.relu = nn.ReLU()
+
+
 
     def forward(self, x):
         x = self.pixel_shuffle(x)
@@ -38,9 +47,16 @@ class AppearanceNetwork(nn.Module):
     def __init__(self, num_input_channels, num_output_channels):
         super(AppearanceNetwork, self).__init__()
 
-        self.conv1 = nn.Conv2d(num_input_channels, 256, 3, stride=1, padding=1)
-        self.up1 = UpsampleBlock(256, 128)
-        self.up2 = UpsampleBlock(128, 64)
+        self.UNet = UNet(3,num_output_channels,bilinear=True)
+        
+
+        self.conv1 = nn.Conv2d(3, 64, 3, stride=1, padding=1)
+        self.up1 = UpsampleBlock(64, 32)
+        self.up2 = UpsampleBlock(32, 16)
+
+        # self.conv1 = nn.Conv2d(num_input_channels, 256, 3, stride=1, padding=1)
+        # self.up1 = UpsampleBlock(256, 128)
+        # self.up2 = UpsampleBlock(128, 64)
         self.up3 = UpsampleBlock(64, 32)
         self.up4 = UpsampleBlock(32, 16)
 
@@ -49,14 +65,23 @@ class AppearanceNetwork(nn.Module):
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, x, H, W):
-        x = self.conv1(x)
+    def forward(self, image, H, W):
+        image_Unet = self.UNet(image.unsqueeze(0))
+        min_val = torch.min(image_Unet)
+        max_val = torch.max(image_Unet)
+
+        # 执行最小-最大归一化
+        # img_normalized = (image_Unet - min_val) / (max_val - min_val)
+        # img_normalized = img_normalized /2 + 0.5
+
+
+        x = self.conv1(image_Unet)
         x = self.relu(x)
         x = self.up1(x)
         x = self.up2(x)
-        x = self.up3(x)
-        x = self.up4(x)
-        # bilinear interpolation
+        # x = self.up3(x)
+        # x = self.up4(x)
+        # # bilinear interpolation
         x = F.interpolate(x, size=(H, W), mode='bilinear', align_corners=True)
         x = self.conv2(x)
         x = self.relu(x)

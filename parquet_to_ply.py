@@ -7,8 +7,8 @@ def save_ply(pointcloud):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--parquet_path", type=str, default="/media/zhaoyibin/common/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/logs/lego_black/scene_29000.parquet")
-    parser.add_argument("--ply_path", type=str, default="/media/zhaoyibin/common/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/logs/lego_black/scene_29000.ply")
+    parser.add_argument("--parquet_path", type=str, default="/media/zhaoyibin/common/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/logs/test_net/parquet/scene_25000.parquet")
+    parser.add_argument("--ply_path", type=str, default="/media/zhaoyibin/common/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/logs/test_net/scene_25000.ply")
     args = parser.parse_args()
     scene = GaussianPointCloudScene.from_parquet(
         args.parquet_path, config=GaussianPointCloudScene.PointCloudSceneConfig(max_num_points_ratio=None))

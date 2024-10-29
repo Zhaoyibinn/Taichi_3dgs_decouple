@@ -8,7 +8,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_config", default="config/own_config.yaml",type=str)
     parser.add_argument("--gen_template_only",
                         action="store_true", default=False)
-    parser.add_argument("--vis",default=False)
+    parser.add_argument("--vis",default=True)
     # rerun可视化
     parser.add_argument("--decouple", default=False)
     # 是否需要加入外观解耦的模型

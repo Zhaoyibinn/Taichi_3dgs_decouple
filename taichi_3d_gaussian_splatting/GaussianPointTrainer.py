@@ -26,8 +26,8 @@ import numpy as np
 from typing import Optional
 
 
-from taichi_3d_gaussian_splatting.apperance_network import AppearanceNetwork
-from taichi_3d_gaussian_splatting.apperance_network import decouple_appearance
+from taichi_3d_gaussian_splatting.Apperance_Network.apperance_network_unet import AppearanceNetwork
+from taichi_3d_gaussian_splatting.Apperance_Network.apperance_network_unet import decouple_appearance
 import rerun as rr
 from PIL import Image
 import cv2
@@ -107,7 +107,7 @@ class GaussianPointCloudTrainer:
         self.iteration = 0
         # move scene to GPU
 
-        self.appearance_network = AppearanceNetwork(64 + 3, 1).to("cuda")
+        self.appearance_network = AppearanceNetwork(64 + 3, 3).to("cuda")
 
         std = 1e-4
         self._appearance_embeddings = nn.Parameter(torch.empty(100, 64).to("cuda"))
@@ -223,11 +223,11 @@ class GaussianPointCloudTrainer:
                 appearance_embedding = self.get_apperance_embedding(view_idx)
                 decouple_image, transformation_map = decouple_appearance(image_pred, appearance_embedding,self.appearance_network,q_pointcloud_camera,t_pointcloud_camera)
                 image_pred_saved = image_pred
-                image_pred = decouple_image
+                # image_pred = decouple_image
                 loss, l1_loss, ssim_loss, mask_loss = self.loss_function(
                     self.iteration,
                     decouple_image,
-                    image_pred,
+                    decouple_image,
                     image_gt,
                     point_invalid_mask=self.scene.point_invalid_mask,
                     pointcloud_features=self.scene.point_cloud_features,
@@ -276,14 +276,19 @@ class GaussianPointCloudTrainer:
                 print("\033[31mzyb测试用, 输出mask\033[0m")
                 print(f"\033[31mmax:{transformation_map.max()}\033[0m")
                 print(f"\033[31mmin:{transformation_map.min()}\033[0m")
-                cv2.imwrite(os.path.join(self.config.output_model_dir,"test_mask_vis.png"),np.array(transformation_map.cpu().detach()) *255)
-
+                mask_saved_floder = os.path.join(self.config.output_model_dir,"mask_vis")
+                if not os.path.exists(mask_saved_floder):
+                    # 如果不存在，创建文件夹
+                    os.makedirs(mask_saved_floder)
+                cv2.imwrite(os.path.join(mask_saved_floder,f"iteration_str_{str(iteration)}_idx_{str(int(view_idx))}.png"),np.array(transformation_map.cpu().detach()) *255)
+                
             if iteration%300 ==0 and rrvis ==True:
                 
                 rr.set_time_sequence("frame", iteration)
                 # Log colored 3D points to the entity at `path/to/points`
                 rr.log("points3d", rr.Points3D(self.scene.point_cloud.cpu().detach(), colors=[255, 255, 255]))
-                rr.log("decouple",rr.Image(np.transpose(image_pred.cpu().detach(), (1, 2, 0))))
+                if decouple:
+                    rr.log("decouple",rr.Image(np.transpose(decouple_image.cpu().detach(), (1, 2, 0))))
                 rr.log(
                     "groundtruth",
                     rr.Image(np.transpose(image_gt.cpu().detach(), (1, 2, 0))))
@@ -291,8 +296,8 @@ class GaussianPointCloudTrainer:
                     "render",
                     rr.Image(np.transpose(image_pred_saved.cpu().detach(), (1, 2, 0))))
                 if decouple:
-                    rr.log("decouple_map",rr.Image(transformation_map.cpu().detach()))
-
+                    # rr.log("decouple_map",rr.Image(transformation_map.cpu().detach()))
+                    rr.log("decouple_map",rr.Image(np.transpose(transformation_map.cpu().detach(), (1, 2, 0))))
 
 
             recent_losses.append(loss.item())
@@ -535,10 +540,11 @@ class GaussianPointCloudTrainer:
                 #
 
                 img = Image.fromarray(np.transpose(torch.clamp(image_pred * 255, 0, 255).byte().cpu().numpy(),(1, 2, 0)), 'RGB')
-                if not os.path.exists(f'test_render/iteration_{iteration}'):
+                
+                if not os.path.exists(self.config.output_model_dir + f'/test_render/iteration_{iteration}'):
                     # 如果不存在，则创建文件夹
-                    os.makedirs(f'test_render/iteration_{iteration}')
-                img.save(f'test_render/iteration_{iteration}/frame_{idx:03}.png')
+                    os.makedirs(self.config.output_model_dir + f'/test_render/iteration_{iteration}')
+                img.save(self.config.output_model_dir + f'/test_render/iteration_{iteration}/frame_{idx:03}.png')
 
             if self.config.enable_taichi_kernel_profiler:
                 ti.profiler.print_kernel_profiler_info("count")
@@ -563,12 +569,23 @@ class GaussianPointCloudTrainer:
                 print(f"val_ssim={mean_ssim_score};")
                 print(f"val_ssim_{iteration}={mean_ssim_score};")
                 print(f"val_inference_time={average_inference_time};")
+
+            if not os.path.exists(os.path.join(self.config.output_model_dir, "parquet")):
+                # 如果不存在，则创建文件夹
+                os.makedirs(os.path.join(self.config.output_model_dir, "parquet"))
             self.scene.to_parquet(
-                os.path.join(self.config.output_model_dir, f"scene_{iteration}.parquet"))
-            self.save_decoupled_model(os.path.join(self.config.output_model_dir, f"model_{iteration}.pth"),os.path.join(self.config.output_model_dir, f"apperance_vector_{iteration}.pth"))
+                os.path.join(self.config.output_model_dir, "parquet",f"scene_{iteration}.parquet"))
+            
+            if not os.path.exists(os.path.join(self.config.output_model_dir,"decoupled_model")):
+                # 如果不存在，则创建文件夹
+                os.makedirs(os.path.join(self.config.output_model_dir,"decoupled_model"))
+            if not os.path.exists(os.path.join(self.config.output_model_dir,"apperance_vector")):
+                # 如果不存在，则创建文件夹
+                os.makedirs(os.path.join(self.config.output_model_dir,"apperance_vector"))
+            self.save_decoupled_model(os.path.join(self.config.output_model_dir,"decoupled_model", f"model_{iteration}.pth"),os.path.join(self.config.output_model_dir,"apperance_vector", f"apperance_vector_{iteration}.pth"))
 
 
             if mean_psnr_score > self.best_psnr_score:
                 self.best_psnr_score = mean_psnr_score
                 self.scene.to_parquet(
-                    os.path.join(self.config.output_model_dir, f"best_scene.parquet"))
+                    os.path.join(self.config.output_model_dir, "parquet",f"best_scene.parquet"))

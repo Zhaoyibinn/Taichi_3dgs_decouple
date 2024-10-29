@@ -57,5 +57,5 @@ rasterisation-config:
   rgb-only: false
 summary-writer-log-dir: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/logs/test_net
 train-dataset-json-path: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lego/train.json
-val-dataset-json-path: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lego/train.json
+val-dataset-json-path: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lego/val.json
 val-interval: 1000

@@ -15,7 +15,7 @@ parser = argparse.ArgumentParser("Prepare dataset for 3D Gaussian Splatting from
 # parser.add_argument("--image_path", type=str, required=True, help="Path to the COLMAP Image folder")
 # parser.add_argument("--test_image_list_path", type=str, default=None, help="Path to the test image list")
 # parser.add_argument("--output_dir", type=str, required=True, help="Path to the output folder")
-root_path = "/home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lego"
+root_path = "/media/zhaoyibin/common/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lego"
 parser.add_argument("--base_path", type=str, default=root_path + "/models")
 parser.add_argument("--image_path", type=str, default=root_path + "/imgs")
 parser.add_argument("--test_image_list_path", type=str, default=None)
@@ -317,7 +317,7 @@ if test_image_list_path is not None:
     df["is_train"] = df["image_path"].apply(lambda x: os.path.basename(x) not in test_images)
 else:
     # taking every 8th photo for test,
-    df["is_train"] = df.index % 8 != 10000000
+    df["is_train"] = df.index % 5 != 1
     
 # test_images = [f"00{idx}.png" for idx in range(175, 250)]
 # select training data and validation data, have a val every 3 frames
