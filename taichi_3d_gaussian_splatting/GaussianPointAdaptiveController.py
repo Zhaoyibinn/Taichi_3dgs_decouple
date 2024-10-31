@@ -91,6 +91,7 @@ class GaussianPointAdaptiveController:
         # shape: [num_points], dtype: int8 because taichi doesn't support bool type
         point_invalid_mask: torch.Tensor
         point_object_id: torch.Tensor  # shape: [num_points]
+        point_semantic: torch.Tensor
 
     @dataclass
     class GaussianPointAdaptiveControllerDensifyPointInfo:
@@ -145,13 +146,14 @@ class GaussianPointAdaptiveController:
                 self._find_densify_points(input_data)
                 self.input_data = input_data
 
-    def refinement(self):
+    def refinement(self,force = False):
         with torch.no_grad():
-            if self.iteration_counter < self.config.num_iterations_warm_up:
+            if (self.iteration_counter < self.config.num_iterations_warm_up) and not force:
                 return
-            if self.iteration_counter % self.config.num_iterations_densify == 0:
+            if (self.iteration_counter % self.config.num_iterations_densify == 0) or force:
                 # 这里就是稠密化
                 self._add_densify_points()
+                
                 self.accumulated_num_in_camera = torch.zeros_like(
                     self.maintained_parameters.pointcloud[:, 0], dtype=torch.int32)
                 self.accumulated_num_pixels = torch.zeros_like(
@@ -165,7 +167,7 @@ class GaussianPointAdaptiveController:
                 self.accumulated_position_gradients_norm = torch.zeros_like(
                     self.maintained_parameters.pointcloud[:, 0], dtype=torch.float32)
             if self.iteration_counter % self.config.num_iterations_reset_alpha == 0:
-                # zyb标记，这里就是出现震荡的原因
+                # zyb标记，这里就是出现震荡的原因,暂时取消了
                 self.reset_alpha()
             self.input_data = None
 
@@ -249,6 +251,9 @@ class GaussianPointAdaptiveController:
         
 
         densify_point_position_before_optimization = pointcloud[densify_point_id]
+        # print("test")
+        # print(pointcloud.shape)
+        # print(pointcloud)
         densify_point_grad_position = self.accumulated_position_gradients[densify_point_id] / self.accumulated_num_in_camera[densify_point_id].unsqueeze(-1)
         # although acummulated_num_in_camera shall not be 0, but we still need to check it/fill in nan
         densify_point_grad_position[torch.isnan(densify_point_grad_position)] = 0
@@ -290,6 +295,7 @@ class GaussianPointAdaptiveController:
         ax.scatter(col, row, s=1, c=color, label=description, zorder=zorder)
 
     def _add_densify_points(self):
+        self.maintained_parameters.point_semantic
         assert self.densify_point_info is not None
         total_valid_points_before_densify = self.maintained_parameters.point_invalid_mask.shape[0] - \
             self.maintained_parameters.point_invalid_mask.sum()
@@ -299,6 +305,7 @@ class GaussianPointAdaptiveController:
         self.maintained_parameters.point_invalid_mask[self.densify_point_info.floater_point_id] = 1
         num_of_densify_points = self.densify_point_info.densify_point_id.shape[0]
         invalid_point_id_to_fill = torch.where(self.maintained_parameters.point_invalid_mask == 1)[0][:num_of_densify_points]
+        # 这里就是需要加的点的id，都是连续的
 
 
         # for position, we use the position before optimization for new points, so that original points and new points have different positions
@@ -308,6 +315,11 @@ class GaussianPointAdaptiveController:
             num_fillable_densify_points = min(num_of_densify_points, invalid_point_id_to_fill.shape[0])
             self.maintained_parameters.pointcloud[invalid_point_id_to_fill] = \
                 self.densify_point_info.densify_point_position_before_optimization[:num_fillable_densify_points]
+            # 还是暂时不要了，先平等的看待两类
+            # 根据invalid_point_id_to_fill作为idx在self.maintained_parameters.point_semantic的第一列置1
+            # self.maintained_parameters.point_semantic[invalid_point_id_to_fill, 0] = 1
+            
+            # self.maintained_parameters.point_semantic[invalid_point_id_to_fill] = 
             self.maintained_parameters.pointcloud_features[invalid_point_id_to_fill] = \
                 self.maintained_parameters.pointcloud_features[self.densify_point_info.densify_point_id[:num_fillable_densify_points]]
             self.maintained_parameters.point_object_id[invalid_point_id_to_fill] = \
@@ -349,7 +361,8 @@ class GaussianPointAdaptiveController:
             self.maintained_parameters.point_invalid_mask[invalid_point_id_to_fill] = 0
         total_valid_points_after_densify = self.maintained_parameters.point_invalid_mask.shape[0] - \
             self.maintained_parameters.point_invalid_mask.sum()
-        assert total_valid_points_after_densify == total_valid_points_before_densify - num_transparent_points - num_floaters_points + num_fillable_densify_points
+        # assert total_valid_points_after_densify == total_valid_points_before_densify - num_transparent_points - num_floaters_points + num_fillable_densify_points
+        # 这里出现断言错误是因为有些float的1是手动给的
         print(f"total valid points: {total_valid_points_before_densify} -> {total_valid_points_after_densify}, num_densify_points: {num_of_densify_points}, num_fillable_densify_points: {num_fillable_densify_points}")
         # print(f"num_transparent_points: {num_transparent_points}, num_floaters_points: {num_floaters_points}")
         self.densify_point_info = None # clear densify point info

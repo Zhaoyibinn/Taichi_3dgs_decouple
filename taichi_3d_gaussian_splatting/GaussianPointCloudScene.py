@@ -25,6 +25,7 @@ class GaussianPointCloudScene(torch.nn.Module):
     def __init__(
         self,
         point_cloud: Union[np.ndarray, torch.Tensor],
+        origin_all_config,
         config: PointCloudSceneConfig,
         point_cloud_features: Optional[torch.Tensor] = None,
         point_object_id: Optional[torch.Tensor] = None,
@@ -48,6 +49,16 @@ class GaussianPointCloudScene(torch.nn.Module):
         else:
             point_cloud = point_cloud.contiguous()
 
+        self.num_categories = origin_all_config.instance_num
+        # zyb赵逸彬标记。此处需要修改种类
+        not_zero_rows = torch.ne(point_cloud, torch.tensor([0, 0, 0])).all(dim=1)
+        idx = torch.nonzero(not_zero_rows).squeeze()
+        instance = torch.zeros((point_cloud.shape[0], self.num_categories))
+        # instance[idx,0] = 1
+
+        self._instance = nn.Parameter(instance.clone().to(device="cuda", dtype=torch.float))
+
+        # self._instance = nn.Parameter(torch.tensor(instance))
 
 
         self.point_cloud = nn.Parameter(point_cloud)
@@ -190,7 +201,7 @@ class GaussianPointCloudScene(torch.nn.Module):
         PlyData([el]).write(path)
 
     @staticmethod
-    def from_parquet(path: str, config=PointCloudSceneConfig()):
+    def from_parquet(path: str, origin_all_config,config=PointCloudSceneConfig()):
         scene_df = pd.read_parquet(path)
         feature_columns = [f"cov_q{i}" for i in range(4)] + \
             [f"cov_s{i}" for i in range(3)] + \
@@ -207,7 +218,7 @@ class GaussianPointCloudScene(torch.nn.Module):
 
         if not set(feature_columns).issubset(set(scene_df.columns)):
             scene = GaussianPointCloudScene(
-                point_cloud, config)
+                point_cloud, origin_all_config, config)
 
             point_cloud_rgb = scene_df[["r", "g", "b"]
                                        ].to_numpy() if df_has_color else None
@@ -216,7 +227,7 @@ class GaussianPointCloudScene(torch.nn.Module):
             valid_point_cloud_features = torch.from_numpy(
                 scene_df[feature_columns].to_numpy())
             scene = GaussianPointCloudScene(
-                point_cloud, config, point_cloud_features=valid_point_cloud_features)
+                point_cloud, origin_all_config,config, point_cloud_features=valid_point_cloud_features)
         return scene
 
     @staticmethod

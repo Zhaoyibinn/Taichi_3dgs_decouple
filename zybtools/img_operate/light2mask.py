@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from torchgen.api.cpp import return_type
+# from torchgen.api.cpp import return_type
 import os
 
 def color2mask(path,filename,save_folder_path):
@@ -15,8 +15,8 @@ def color2mask(path,filename,save_folder_path):
     return gray_image
 
 
-folder_path = '/home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/data/real_camera_3/2/imgs/'
-save_folder_path = '/home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/data/real_camera_3/2/light_masks/'
+folder_path = '/media/zhaoyibin/common/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lower_lego/imgs/'
+save_folder_path = '/media/zhaoyibin/common/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lower_lego/light_masks/'
 entries = os.listdir(folder_path)
 for entry in entries:
     # 获取文件的完整路径

@@ -4,7 +4,7 @@ import os
 import numpy as np
 
 # 设置你的文件夹路径
-folder_path = '/media/zhaoyibin/common/3DRE/论文相关/paper/old_data/NeRF/nerf_synthetic/lego/test_lego_zyb'
+folder_path = '/media/zhaoyibin/common/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lego/imgs'
 
 # 遍历文件夹中的所有文件
 for filename in os.listdir(folder_path):

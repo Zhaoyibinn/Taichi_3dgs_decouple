@@ -17,7 +17,7 @@ def decouple_appearance(image, appearance_embedding,appearance_network,q,t):
     # torch.cat([crop_image_down, appearance_embedding[None].repeat(H // 32, W // 32, 1).permute(2, 0, 1)], dim=0)[None]
     crop_image_down = \
     torch.nn.functional.interpolate(image[None], size=(H // 4, W // 4), mode="bilinear", align_corners=True)[0]
-    mapping_image = appearance_network(crop_image_down, H, W).squeeze()
+    mapping_image = appearance_network(crop_image_down, H, W,q,t).squeeze()
     transformed_image = mapping_image * image
 
     return transformed_image, mapping_image
@@ -47,42 +47,48 @@ class AppearanceNetwork(nn.Module):
     def __init__(self, num_input_channels, num_output_channels):
         super(AppearanceNetwork, self).__init__()
 
-        self.UNet = UNet(3,num_output_channels,bilinear=True)
+        self.UNet = UNet(3,1,bilinear=True)
         
 
-        self.conv1 = nn.Conv2d(3, 64, 3, stride=1, padding=1)
+        self.conv1 = nn.Conv2d(8, 64, 3, stride=1, padding=1)
         self.up1 = UpsampleBlock(64, 32)
         self.up2 = UpsampleBlock(32, 16)
+        # self.up3 = UpsampleBlock(16, 8)
+        # self.up4 = UpsampleBlock(32, 16)
 
         # self.conv1 = nn.Conv2d(num_input_channels, 256, 3, stride=1, padding=1)
         # self.up1 = UpsampleBlock(256, 128)
         # self.up2 = UpsampleBlock(128, 64)
-        self.up3 = UpsampleBlock(64, 32)
-        self.up4 = UpsampleBlock(32, 16)
+        # self.up3 = UpsampleBlock(64, 32)
+        # self.up4 = UpsampleBlock(32, 16)
 
+        # self.conv2 = nn.Conv2d(16, 16, 3, stride=1, padding=1)
+        # self.conv3 = nn.Conv2d(16, num_output_channels, 3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(16, 16, 3, stride=1, padding=1)
-        self.conv3 = nn.Conv2d(16, num_output_channels, 3, stride=1, padding=1)
+        self.conv3 = nn.Conv2d(16, 1, 3, stride=1, padding=1)
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, image, H, W):
+    def forward(self, image, H, W,q,t):
         image_Unet = self.UNet(image.unsqueeze(0))
-        min_val = torch.min(image_Unet)
-        max_val = torch.max(image_Unet)
+        # min_val = torch.min(image_Unet)
+        # max_val = torch.max(image_Unet)
 
         # 执行最小-最大归一化
         # img_normalized = (image_Unet - min_val) / (max_val - min_val)
         # img_normalized = img_normalized /2 + 0.5
 
-
-        x = self.conv1(image_Unet)
+        qt = torch.cat([q,t],dim=1)
+        image_Unet_qt = torch.cat([image_Unet.squeeze(0), qt[None].repeat(image_Unet.shape[2], image_Unet.shape[3], 1).permute(2, 0, 1)], dim=0)[None]
+        # image先降采样过一遍UNet，然后在后面连上qt
+        x = self.conv1(image_Unet_qt)
         x = self.relu(x)
         x = self.up1(x)
         x = self.up2(x)
         # x = self.up3(x)
         # x = self.up4(x)
         # # bilinear interpolation
-        x = F.interpolate(x, size=(H, W), mode='bilinear', align_corners=True)
+        # x = F.interpolate(x, size=(H, W), mode='bilinear', align_corners=True)
         x = self.conv2(x)
         x = self.relu(x)
         x = self.conv3(x)

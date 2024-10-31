@@ -4,8 +4,14 @@ Fork of taichi_3d_gaussian_splatting. Add decoupled model to solve different lig
 
 The rendered picture is masked by decoupled model to avoid dark floaters.
 
-**Created by ZhaoYiBin from ECUST LAB10204 3DReconstruction Group**
+这是一个语义分割分支，后续考虑将语义分割融入训练过程中，一遍训练一边去掉离散点
 
+你别说，你还真别说，UNet测试下来还真是最好的（也就好了一丝丝）
+
+2024-10-31 We have integrated the filtering of lighting semantics into the entire training process (seemingly), theoretically allowing for the periodic removal of floating objects while training (by setting them as floating objects and updating them in the refinement)
+
+
+**Created by ZhaoYiBin from ECUST LAB10204 3DReconstruction Group**
 
 # taichi_3d_gaussian_splatting
 
