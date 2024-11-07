@@ -26,8 +26,8 @@ import numpy as np
 from typing import Optional
 
 
-from taichi_3d_gaussian_splatting.Apperance_Network.apperance_network_unet import AppearanceNetwork
-from taichi_3d_gaussian_splatting.Apperance_Network.apperance_network_unet import decouple_appearance
+from taichi_3d_gaussian_splatting.Apperance_Network.apperance_network_origin import AppearanceNetwork
+from taichi_3d_gaussian_splatting.Apperance_Network.apperance_network_origin import decouple_appearance
 import rerun as rr
 from PIL import Image
 import cv2
@@ -40,6 +40,7 @@ def cycle(dataloader):
 class GaussianPointCloudTrainer:
     @dataclass
     class TrainConfig(YAMLWizard):
+        do_del_black: bool = False
         do_decouple: bool = False
         data_root_dir: str = ""
         do_instance: bool = False
@@ -88,7 +89,7 @@ class GaussianPointCloudTrainer:
             dataset_json_path=self.config.val_dataset_json_path)
         
         self.mask_train_dataset = ImagePoseDataset(
-            dataset_json_path=self.config.mask_train_dataset_json_path)
+            dataset_json_path=self.config.train_dataset_json_path)
         
         self.scene = GaussianPointCloudScene.from_parquet(
             self.config.pointcloud_parquet_path, config,config=self.config.gaussian_point_cloud_scene_config)
@@ -120,7 +121,7 @@ class GaussianPointCloudTrainer:
         self.appearance_network = AppearanceNetwork(64 + 3, 3).to("cuda")
 
         std = 1e-4
-        self._appearance_embeddings = nn.Parameter(torch.empty(100, 64).to("cuda"))
+        self._appearance_embeddings = nn.Parameter(torch.empty(500, 64).to("cuda"))
         self._appearance_embeddings.data.normal_(0, std)
         l_instance = [
             {'params': [self.scene._instance], 'lr': 0.1, "name": "instance"},
@@ -134,6 +135,8 @@ class GaussianPointCloudTrainer:
         self.number_instance_categories = config.instance_num
 
         self.do_decouple = config.do_decouple
+
+        self.do_del_black = config.do_del_black
 
     def process_instance_image(self,instance_image):
         combined_unique_values = torch.unique(torch.cat((self.instance_number_to_index, torch.unique(instance_image))))
@@ -151,6 +154,7 @@ class GaussianPointCloudTrainer:
         # return self.instance_activation(self.scene._instance)
         return self.scene._instance
 
+    
 
     def del_bad_instance(self):
         instance = self.get_instance()
@@ -162,16 +166,27 @@ class GaussianPointCloudTrainer:
         #     self.scene.point_cloud_features[visible_bad_instance_idx, 3:6] = self.scene.point_cloud_features[visible_bad_instance_idx, 3:6].detach()
         #     self.scene.point_cloud_features[visible_bad_instance_idx, 3:6] = 1e-9
         self.adaptive_controller.maintained_parameters.point_invalid_mask[visible_bad_instance_idx] = 1
+        print(f"\033[31m因为语义删除了{visible_bad_instance_idx.shape}个点\033[0m")
         # 这里把语义不对的点赋值mask1
         
+    def del_black(self):
+        r = self.scene.point_cloud_features[:,8]
+        g = self.scene.point_cloud_features[:,24]
+        b = self.scene.point_cloud_features[:,40]
+        rgb_mean = (r + g + b)/3
+        idx = torch.nonzero(rgb_mean < - (0.5 / 0.28209479177387814), as_tuple=False).squeeze()
+        self.adaptive_controller.maintained_parameters.point_invalid_mask[idx] = 1
 
-        
+        print(f"\033[31m因为颜色删除了{idx.shape}个点\033[0m")
+
+
+        # self.adaptive_controller.maintained_parameters.point_invalid_mask[idx] = 1
         
     def do_instance_iterations(self,train_data_loader_iter_instance,iterations=100):  # 对语义的操作
         instance_optimizer = self.instance_optimizer
         for iteration in range(iterations):
             viewpoint_stack = None
-            mask_gt , image_gt, q_pointcloud_camera, t_pointcloud_camera, camera_info ,index= next(train_data_loader_iter_instance)
+            _,mask_gt , image_gt, q_pointcloud_camera, t_pointcloud_camera, camera_info ,index= next(train_data_loader_iter_instance)
             image_gt = mask_gt
             image_instance_gt = self.process_instance_image(image_gt[0].view(1, image_gt[0].shape[0], image_gt[0].shape[1])).cuda()
             # image_instance_gt[image_instance_gt!=1] = 0
@@ -228,19 +243,21 @@ class GaussianPointCloudTrainer:
             instance_loss = instance_cel(all_instance_images, gt_labels)
 
             instance_loss.backward()
-            print(f"Doing Instance Iteration: {iteration}", instance_loss)
+            # print(f"Doing Instance Iteration: {iteration}", instance_loss)
             with torch.no_grad():
                 instance_optimizer.step()
                 instance_optimizer.zero_grad(set_to_none=True)
 
             if iteration%10 ==0:
+                print(f"do instance {iteration}")
                 rr.set_time_sequence("frame", iteration)
                 # Log colored 3D points to the entity at `path/to/points`
-                # rr.log("points3d", rr.Points3D(self.scene.point_cloud.cpu().detach(), colors=[255, 255, 255]))
+                # rr.log("points3d", rr.Points3D(self.scene.point_2cloud.cpu().detach(), colors=[255, 255, 255]))
                 rr.log("render_instance",rr.Image((instance_images.cpu().detach() * 200).long()[:,:,0].unsqueeze(2) ))
                 rr.log(
                     "groundtruth_instance",
                     rr.Image(np.transpose(image_instance_gt.cpu().detach() * 200, (1, 2, 0))))
+
 
 
     def get_apperance_embedding(self, idx):
@@ -291,10 +308,13 @@ class GaussianPointCloudTrainer:
         mask_train_data_loader = torch.utils.data.DataLoader(
             self.mask_train_dataset, batch_size=None, shuffle=False, pin_memory=True, num_workers=0)
 
-        
+        # all_mask_val_data_loader = torch.utils.data.DataLoader(
+        #     self.val_dataset, batch_size=None, shuffle=False, pin_memory=True, num_workers=0)
+
         train_data_loader_iter = cycle(train_data_loader)
         # train_data_loader_iter = cycle(mask_train_data_loader)
         mask_train_loader_iter = cycle(mask_train_data_loader)
+        # all_mask_val_data_iter = cycle(all_mask_val_data_loader)
         # train_data_loader_iter = mask_train_loader_iter
         l = [
             {'params': self._appearance_embeddings, 'lr': 0.001,
@@ -327,7 +347,7 @@ class GaussianPointCloudTrainer:
             optimizer.zero_grad()
             position_optimizer.zero_grad()
 
-            mask_gt , image_gt, q_pointcloud_camera, t_pointcloud_camera, camera_info,index = next(
+            _,mask_gt , image_gt, q_pointcloud_camera, t_pointcloud_camera, camera_info,index = next(
                 train_data_loader_iter)
             # print("test",camera_info)
 
@@ -350,6 +370,7 @@ class GaussianPointCloudTrainer:
                 t_pointcloud_camera=t_pointcloud_camera,
                 color_max_sh_band=1,
             )
+            
             image_pred, image_depth, pixel_valid_point_count = self.rasterisation(
                 gaussian_point_cloud_rasterisation_input)
             # clip to [0, 1]
@@ -412,12 +433,19 @@ class GaussianPointCloudTrainer:
 
             
 
-            if self.do_instance and (iteration % 2000 == 0 and iteration > 2000):
+            if self.do_instance and (iteration % 30000 == 0 and iteration > 1000):
             # if iteration % 3000 == 0:
                 self.validation(decouple,val_data_loader, iteration-1)
-                self.do_instance_iterations(mask_train_loader_iter,100)
+                self.validation_mask(decouple,val_data_loader, iteration-1)
+                self.do_instance_iterations(mask_train_loader_iter,1000)
                 print("完成语义属性的更新")
                 self.del_bad_instance()
+
+            if self.do_del_black and (iteration % 3000 == 0 and iteration > 1000):
+                
+
+                self.del_black()
+
                 
 
                 # self.adaptive_controller.refinement(force=True)
@@ -427,9 +455,9 @@ class GaussianPointCloudTrainer:
 
             position_optimizer.step()
             if iteration%300 == 0 and decouple:
-                print("\033[31mzyb测试用, 输出mask\033[0m")
-                print(f"\033[31mmax:{transformation_map.max()}\033[0m")
-                print(f"\033[31mmin:{transformation_map.min()}\033[0m")
+                # print("\033[31mzyb测试用, 输出mask\033[0m")
+                # print(f"\033[31mmax:{transformation_map.max()}\033[0m")
+                # print(f"\033[31mmin:{transformation_map.min()}\033[0m")
                 mask_saved_floder = os.path.join(self.config.output_model_dir,"mask_vis")
                 if not os.path.exists(mask_saved_floder):
                     # 如果不存在，创建文件夹
@@ -453,8 +481,8 @@ class GaussianPointCloudTrainer:
                     "render",
                     rr.Image(np.transpose(image_pred_saved.cpu().detach(), (1, 2, 0))))
                 if decouple:
-                    rr.log("decouple_map",rr.Image(transformation_map.cpu().detach()))
-                    # rr.log("decouple_map",rr.Image(np.transpose(transformation_map.cpu().detach(), (1, 2, 0))))
+                    # rr.log("decouple_map",rr.Image(transformation_map.cpu().detach()))
+                    rr.log("decouple_map",rr.Image(np.transpose(transformation_map.cpu().detach(), (1, 2, 0))))
 
 
             recent_losses.append(loss.item())
@@ -561,6 +589,7 @@ class GaussianPointCloudTrainer:
 
             if (iteration % self.config.val_interval == 0 and iteration != 0) or iteration == 7000 or iteration == 5000: # they use 7000 in paper, it's hard to set a interval so hard code it here
                 self.validation(decouple,val_data_loader, iteration)
+                self.validation_mask(decouple,val_data_loader, iteration)
     #             这里其实就保存了，每次val都会保存
 
     @staticmethod
@@ -640,7 +669,7 @@ class GaussianPointCloudTrainer:
             for idx, val_data in enumerate(tqdm(val_data_loader)):
                 start_event = torch.cuda.Event(enable_timing=True)
                 end_event = torch.cuda.Event(enable_timing=True)
-                mask_gt,image_gt, q_pointcloud_camera, t_pointcloud_camera, camera_info ,index= val_data
+                _,mask_gt,image_gt, q_pointcloud_camera, t_pointcloud_camera, camera_info ,index= val_data
                 image_gt = image_gt.cuda()
                 q_pointcloud_camera = q_pointcloud_camera.cuda()
                 t_pointcloud_camera = t_pointcloud_camera.cuda()
@@ -674,13 +703,13 @@ class GaussianPointCloudTrainer:
 
                 view_idx = index
 
-                if decouple:
-                    appearance_embedding = self.get_apperance_embedding(view_idx)
-                    decouple_image, transformation_map = decouple_appearance(image_pred, appearance_embedding,
-                                                                             self.appearance_network,q_pointcloud_camera,t_pointcloud_camera)
-                    image_pred_saved = image_pred
-                    image_pred = decouple_image
-                # print("请注意，目前解耦，但是val没有采用，因为采用了外观嵌入")
+                # if decouple:
+                #     appearance_embedding = self.get_apperance_embedding(view_idx)
+                #     decouple_image, transformation_map = decouple_appearance(image_pred, appearance_embedding,
+                #                                                              self.appearance_network,q_pointcloud_camera,t_pointcloud_camera)
+                #     image_pred_saved = image_pred
+                #     image_pred = decouple_image
+                print("请注意，目前解耦，但是val没有采用，因为采用了外观向量嵌入")
 
 
                 image_depth = self._easy_cmap(image_depth)
@@ -748,5 +777,111 @@ class GaussianPointCloudTrainer:
                 self.best_psnr_score = mean_psnr_score
                 self.scene.to_parquet(
                     os.path.join(self.config.output_model_dir, "parquet",f"best_scene.parquet"))
+    def validation_mask(self, decouple,val_data_loader, iteration):
+        with torch.no_grad():
+            total_loss = 0.0
+            total_psnr_score = 0.0
+            total_ssim_score = 0.0
+            if self.config.enable_taichi_kernel_profiler:
+                ti.profiler.print_kernel_profiler_info("count")
+                ti.profiler.clear_kernel_profiler_info()
+            total_inference_time = 0.0
+            for idx, val_data in enumerate(tqdm(val_data_loader)):
+                start_event = torch.cuda.Event(enable_timing=True)
+                end_event = torch.cuda.Event(enable_timing=True)
+                image_gt,_,_, q_pointcloud_camera, t_pointcloud_camera, camera_info ,index= val_data
+                image_gt = image_gt.cuda()[:3]
+                q_pointcloud_camera = q_pointcloud_camera.cuda()
+                t_pointcloud_camera = t_pointcloud_camera.cuda()
+                camera_info.camera_intrinsics = camera_info.camera_intrinsics.cuda()
+                # make taichi happy.
+                camera_info.camera_width = int(camera_info.camera_width)
+                camera_info.camera_height = int(camera_info.camera_height)
+                point_cloud_features_mask = torch.tensor(self.scene.point_cloud_features,requires_grad=False)
+                point_cloud_features_mask[:, 8:] = 0
+                # 这里三维分别是RGB，应该都一样
+                # point_cloud_features_instance[:, 7] = 1
+                point_cloud_features_mask[:, 8] = point_cloud_features_mask[:, 8] + 1/0.28209479177387814
+                point_cloud_features_mask[:, 24] = point_cloud_features_mask[:, 24] + 1/0.28209479177387814
+                point_cloud_features_mask[:, 40] = point_cloud_features_mask[:, 40] + 1/0.28209479177387814
+                gaussian_point_cloud_rasterisation_input = GaussianPointCloudRasterisation.GaussianPointCloudRasterisationInput(
+                    point_cloud=self.scene.point_cloud,
+                    point_cloud_features=point_cloud_features_mask,
+                    point_object_id=self.scene.point_object_id,
+                    point_invalid_mask=self.scene.point_invalid_mask,
+                    camera_info=camera_info,
+                    q_pointcloud_camera=q_pointcloud_camera,
+                    t_pointcloud_camera=t_pointcloud_camera,
+                    color_max_sh_band=3
+                )
+                start_event.record()
+                image_pred, image_depth, pixel_valid_point_count = self.rasterisation(
+                    gaussian_point_cloud_rasterisation_input)
 
-# %%
+
+
+                end_event.record()
+                torch.cuda.synchronize()
+                time_taken = start_event.elapsed_time(end_event)
+                total_inference_time += time_taken
+                image_pred = torch.clamp(image_pred, 0, 1)
+                image_pred = image_pred.permute(2, 0, 1)
+
+
+                view_idx = index
+
+                # if decouple:
+                #     appearance_embedding = self.get_apperance_embedding(view_idx)
+                #     decouple_image, transformation_map = decouple_appearance(image_pred, appearance_embedding,
+                #                                                              self.appearance_network,q_pointcloud_camera,t_pointcloud_camera)
+                #     image_pred_saved = image_pred
+                #     image_pred = decouple_image
+                print("请注意，目前解耦，但是val没有采用，因为采用了外观向量嵌入")
+
+
+                image_depth = self._easy_cmap(image_depth)
+                pixel_valid_point_count = pixel_valid_point_count.float().unsqueeze(0).repeat(3, 1, 1) / pixel_valid_point_count.max()
+                loss, _, _ ,_= self.loss_function(iteration,image_pred,image_pred, image_gt)
+                psnr_score, ssim_score = self._compute_pnsr_and_ssim(
+                    image_pred=image_pred, image_gt=image_gt)
+                image_diff = torch.abs(image_pred - image_gt)
+                total_loss += loss.item()
+                total_psnr_score += psnr_score.item()
+                total_ssim_score += ssim_score.item()
+                grid = make_grid([image_pred, image_gt, image_depth, pixel_valid_point_count, image_diff], nrow=2)
+                # if self.config.log_validation_image:
+                #     self.writer.add_image(
+                #         f"val/image {idx}", grid, iteration)
+                #
+
+                img = Image.fromarray(np.transpose(torch.clamp(image_pred * 255, 0, 255).byte().cpu().numpy(),(1, 2, 0)), 'RGB')
+                
+                if not os.path.exists(self.config.output_model_dir + f'/test_render_mask/iteration_{iteration}'):
+                    # 如果不存在，则创建文件夹
+                    os.makedirs(self.config.output_model_dir + f'/test_render_mask/iteration_{iteration}')
+                img.save(self.config.output_model_dir + f'/test_render_mask/iteration_{iteration}/frame_{idx:03}.png')
+
+
+                # img = Image.fromarray(np.transpose(torch.clamp( image_gt* 255, 0, 255).byte().cpu().numpy(),(1, 2, 0)), 'RGB')
+                # if not os.path.exists(self.config.output_model_dir + f'/test_render_mask_gt/iteration_{iteration}'):
+                #     # 如果不存在，则创建文件夹
+                #     os.makedirs(self.config.output_model_dir + f'/test_render_mask_gt/iteration_{iteration}')
+                # img.save(self.config.output_model_dir + f'/test_render_mask_gt/iteration_{iteration}/frame_{idx:03}.png')
+            
+            if self.config.enable_taichi_kernel_profiler:
+                ti.profiler.print_kernel_profiler_info("count")
+                ti.profiler.clear_kernel_profiler_info()
+            average_inference_time = total_inference_time / len(val_data_loader)
+
+            mean_loss = total_loss / len(val_data_loader)
+            mean_psnr_score = total_psnr_score / len(val_data_loader)
+            mean_ssim_score = total_ssim_score / len(val_data_loader)
+            self.writer.add_scalar(
+                "val_mask/loss", mean_loss, iteration)
+            self.writer.add_scalar(
+                "val_mask/psnr", mean_psnr_score, iteration)
+            self.writer.add_scalar(
+                "val_mask/ssim", mean_ssim_score, iteration)
+            self.writer.add_scalar(
+                "val_mask/inference_time", average_inference_time, iteration)
+

@@ -17,16 +17,18 @@ parser = argparse.ArgumentParser("Prepare dataset for 3D Gaussian Splatting from
 # parser.add_argument("--image_path", type=str, required=True, help="Path to the COLMAP Image folder")
 # parser.add_argument("--test_image_list_path", type=str, default=None, help="Path to the test image list")
 # parser.add_argument("--output_dir", type=str, required=True, help="Path to the output folder")
-root_path = "/home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lower_lego"
+root_path = "/home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/chair_mask"
 parser.add_argument("--base_path", type=str, default=root_path + "/models")
 parser.add_argument("--image_path", type=str, default=root_path + "/imgs")
 parser.add_argument("--mask_path", type=str, default=root_path + "/light_masks")
+parser.add_argument("--all_mask_path", type=str, default=root_path + "/masks")
 parser.add_argument("--test_image_list_path", type=str, default=None)
 parser.add_argument("--output_dir", type=str, default=root_path)
 args = parser.parse_args()
 base_path = args.base_path
 image_path = args.image_path
 mask_path = args.mask_path
+all_mask_path = args.all_mask_path
 output_dir = args.output_dir
 
 test_image_list_path = args.test_image_list_path
@@ -281,8 +283,10 @@ for name, image in images.items():
     K = camera['K']
     # Construct the JSON data
     masks_full_path = os.path.join(mask_path, name)
+    all_masks_full_path = os.path.join(all_mask_path, name)
     image_full_path = os.path.join(image_path, name)
     data.append({
+        'all_masks_path':all_masks_full_path,
         'masks_path': masks_full_path,
         'image_path': image_full_path,
         'T_pointcloud_camera': T_pointcloud_camera.tolist(),
@@ -323,17 +327,24 @@ if test_image_list_path is not None:
 
     df["is_train"] = df["image_path"].apply(lambda x: os.path.basename(x) not in test_images)
     df["is_train_mask"] = df["masks_path"].apply(lambda x: os.path.basename(x) not in test_images)
+    df["is_train_all_mask"] = df["all_masks_path"].apply(lambda x: os.path.basename(x) not in test_images)
 else:
     # taking every 8th photo for test,
     df["is_train"] = df.index % 5 != 1
     df["is_train_mask"] = df.index % 5 != 1
+    df["is_train_all_mask"] = df.index % 5!= 1
     
 # test_images = [f"00{idx}.png" for idx in range(175, 250)]
 # select training data and validation data, have a val every 3 frames
 train_df = df[df["is_train"]].copy()
 val_df = df[~df["is_train"]].copy()
+
 train_mask_df = df[df["is_train_mask"]].copy()
 val_mask_df = df[~df["is_train_mask"]].copy()
+
+train_all_mask_df = df[df["is_train_all_mask"]].copy()
+val_all_mask_df = df[~df["is_train_all_mask"]].copy()
+
 print(train_df.shape)
 print(val_df.shape)
 
@@ -341,13 +352,13 @@ train_df.drop(columns=["is_train"], inplace=True)
 val_df.drop(columns=["is_train"], inplace=True)
 train_mask_df.drop(columns=["is_train_mask"], inplace=True)
 val_mask_df.drop(columns=["is_train_mask"], inplace=True)
+train_mask_df.drop(columns=["is_train_all_mask"], inplace=True)
+val_mask_df.drop(columns=["is_train_all_mask"], inplace=True)
 # df.to_json(os.path.join(output_dir, "kitti.json"), orient="records")
 train_df.to_json(os.path.join(
     output_dir, "train.json"), orient="records")
 val_df.to_json(os.path.join(output_dir, "val.json"), orient="records")
-train_mask_df.to_json(os.path.join(
-    output_dir, "train_mask.json"), orient="records")
-val_mask_df.to_json(os.path.join(output_dir, "val_mask.json"), orient="records")
+
 points.to_parquet(os.path.join(
     output_dir, "point_cloud.parquet"))
 

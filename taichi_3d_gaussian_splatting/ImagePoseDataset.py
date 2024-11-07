@@ -63,6 +63,7 @@ class ImagePoseDataset(torch.utils.data.Dataset):
         return image, resized_camera_info
 
     def __getitem__(self, idx):
+        all_mask_path = self.df.iloc[idx]["all_masks_path"]
         mask_path = self.df.iloc[idx]["masks_path"]
         image_path = self.df.iloc[idx]["image_path"]
         T_pointcloud_camera = self._pandas_field_to_tensor(
@@ -76,8 +77,10 @@ class ImagePoseDataset(torch.utils.data.Dataset):
         camera_id = self.df.iloc[idx]["camera_id"]
         image = PIL.Image.open(image_path)
         mask = PIL.Image.open(mask_path)
+        all_mask = PIL.Image.open(all_mask_path)
         image = torchvision.transforms.functional.to_tensor(image)
         mask = torchvision.transforms.functional.to_tensor(mask)
+        all_mask = torchvision.transforms.functional.to_tensor(all_mask)
         # image = image[:3, :, :]
         # use real image size instead of camera_height and camera_width from colmap
         camera_height = image.shape[1]
@@ -92,6 +95,7 @@ class ImagePoseDataset(torch.utils.data.Dataset):
         camera_height = camera_height - camera_height % TILE_HEIGHT
         image = image[:3, :camera_height, :camera_width].contiguous()
         mask = mask[:, :camera_height, :camera_width].contiguous()
+        all_mask = all_mask[:, :camera_height, :camera_width].contiguous()
         camera_info = CameraInfo(
             camera_intrinsics=camera_intrinsics,
             camera_height=camera_height,
@@ -100,4 +104,4 @@ class ImagePoseDataset(torch.utils.data.Dataset):
         )
         index = self.df.iloc[idx]["idx"]
         image, camera_info = ImagePoseDataset._autoscale_image_and_camera_info(image, camera_info)
-        return mask,image, q_pointcloud_camera, t_pointcloud_camera, camera_info,index
+        return all_mask,mask,image, q_pointcloud_camera, t_pointcloud_camera, camera_info,index

@@ -3,10 +3,10 @@ import open3d as o3d
 import numpy as np
 
 
-path = "/media/zhaoyibin/common/3DRE/论文相关/paper/old_data/NeRF/nerf_synthetic/lego/lego.stl"
+path = "/home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/mic_random/mic.stl"
 mesh = o3d.io.read_triangle_mesh(path)
 
-output_cloud = "/media/zhaoyibin/common/3DRE/论文相关/paper/old_data/NeRF/nerf_synthetic/lego/points.ply"
+output_cloud = "/home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/mic_random/points.ply"
 # mesh.compute_vertex_normals()
 # mesh.paint_uniform_color([0.9, 0.1, 0.1])
 

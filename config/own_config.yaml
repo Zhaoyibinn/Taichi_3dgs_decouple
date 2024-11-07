@@ -13,6 +13,7 @@ adaptive-controller-config:
   iteration-start-remove-floater: 2000
   num-iterations-densify: 100
   num-iterations-reset-alpha: 999999
+  # 波动原因
   num-iterations-warm-up: 300
   plot-densify-interval: 200
   reset-alpha-value: -1.9
@@ -26,7 +27,7 @@ gaussian-point-cloud-scene-config:
   initial-alpha: -0.0
   initial-covariance-ratio: 0.1
   max-initial-covariance: 3000.0
-  max-num-points-ratio: 30.0
+  max-num-points-ratio: 40.0
   num-of-features: 56
   num-points-sphere: 10000
   sphere-radius-factor: 4.0
@@ -44,10 +45,10 @@ loss-function-config:
   regularization-weight: 0.005
 num-iterations: 30001
 out-loss: 1000
-output-model-dir: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/logs/NeRF/LEGO_own_UNet_3000
-summary-writer-log-dir: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/logs/NeRF/LEGO_own_UNet_3000
+output-model-dir: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/logs/NeRF/lego_3dgs_mask
+summary-writer-log-dir: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/logs/NeRF/lego_3dgs_mask
 
-data-root-dir: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lower_lego
+data-root-dir: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lego_mask
 # pointcloud-parquet-path: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lower_lego/point_cloud.parquet
 position-learning-rate: 1.0e-05
 position-learning-rate-decay-interval: 100
@@ -59,13 +60,11 @@ rasterisation-config:
   near-plane: 0.4
   rgb-only: false
 
-# train-dataset-json-path: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lower_lego/train.json
-# val-dataset-json-path: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lower_lego/val.json
 val-interval: 1000
 
-# train-mask-dataset-json-path: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lower_lego/train_mask.json
-# train-mask-dataset-json-path: /home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lower_lego/val_mask.json
 do-instance: True
 instance-num: 2
 
 do-decouple: True
+
+do-del-black: False

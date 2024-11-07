@@ -14,9 +14,10 @@ def color2mask(path,filename,save_folder_path):
     cv2.imwrite(save_folder_path+filename,gray_image)
     return gray_image
 
+root_path = "/home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/chair_mask"
 
-folder_path = '/media/zhaoyibin/common/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lower_lego/imgs/'
-save_folder_path = '/media/zhaoyibin/common/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/data/black_NeRF/lower_lego/light_masks/'
+folder_path = root_path + '/imgs/'
+save_folder_path = root_path + '/light_masks/'
 entries = os.listdir(folder_path)
 for entry in entries:
     # 获取文件的完整路径

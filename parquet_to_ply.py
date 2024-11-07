@@ -8,8 +8,8 @@ def save_ply(pointcloud):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--parquet_path", type=str, default="/home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/logs/NeRF/LEGO_3dgs/parquet/scene_29000.parquet")
-    parser.add_argument("--ply_path", type=str, default="/home/zhaoyibin/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/logs/NeRF/LEGO_3dgs/parquet/scene_29000.ply")
+    parser.add_argument("--parquet_path", type=str, default="/media/zhaoyibin/common/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/logs/NeRF/chair_ours_mask/parquet/scene_29999.parquet")
+    parser.add_argument("--ply_path", type=str, default="/media/zhaoyibin/common/3DRE/3DGS/taichi_3d_gaussian_splatting_complex/taichi_data/logs/NeRF/chair_ours_mask/parquet/scene_30000.ply")
     parser.add_argument("--train_config", default="config/own_config.yaml",type=str)
 
     args = parser.parse_args()
